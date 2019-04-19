@@ -1,0 +1,8 @@
+[package]
+name = "baduk-rs"
+version = "0.1.0"
+authors = ["Michael A. Plikk <michael@aptoma.com>"]
+edition = "2018"
+
+[dependencies]
+sgf-parser = { path = "/home/michael/code/rust/sgf-parser" }
