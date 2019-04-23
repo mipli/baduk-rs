@@ -1,4 +1,4 @@
-use crate::{Goban, Captures, Error, Position, Color, SgfToken};
+use crate::{GameState, Captures, Error, Position, Color, SgfToken};
 use sgf_parser::{GameTree as SgfTree};
 
 pub type GameTreeIndex = usize;
@@ -6,7 +6,7 @@ pub type GameTreeIndex = usize;
 #[derive(Debug, Clone)]
 pub struct GameTreeNode {
     pub parent: Option<GameTreeIndex>,
-    pub state: Option<Goban>,
+    pub state: Option<GameState>,
     pub tokens: Vec<SgfToken>,
     pub children: Vec<GameTreeIndex>,
     pub performed_move: Option<PerformedMove>,
@@ -53,7 +53,7 @@ impl Default for GameTree {
 impl GameTree {
     pub fn new(width: usize, height: usize) -> GameTree {
         let mut root = GameTreeNode::new();
-        root.state = Some(Goban::new(width, height));
+        root.state = Some(GameState::new(width, height));
         GameTree {
             root: 0,
             current: 0,
@@ -65,15 +65,15 @@ impl GameTree {
         self.nodes.len()
     }
 
-    pub fn current_state(&self) -> Option<&Goban> {
+    pub fn current_state(&self) -> Option<&GameState> {
         self.nodes[self.current].state.as_ref()
     }
 
     pub fn create_board(&mut self, size: usize) {
-        self.nodes[self.current].state = Some(Goban::new(size, size));
+        self.nodes[self.current].state = Some(GameState::new(size, size));
     }
 
-    fn add_move(&mut self, performed_move: PerformedMove, parent: GameTreeIndex, state: Goban) -> GameTreeIndex {
+    fn add_move(&mut self, performed_move: PerformedMove, parent: GameTreeIndex, state: GameState) -> GameTreeIndex {
         let new_id = self.nodes.len();
         let new_node = GameTreeNode {
             parent: Some(parent),
@@ -152,7 +152,7 @@ impl GameTree {
         }
     }
 
-    pub fn consume_sgf_token(&mut self, token: &SgfToken, node: GameTreeIndex) -> Result<GameTreeIndex, Error> {
+    pub fn parse_sgf_token(&mut self, token: &SgfToken, node: GameTreeIndex) -> Result<GameTreeIndex, Error> {
         let index = match token {
             SgfToken::Move{color, coordinate} => {
                 self.play_move_as_variation(*coordinate, *color, node)?
@@ -171,21 +171,21 @@ impl From<&SgfTree> for GameTree {
     fn from(tree: &SgfTree) -> GameTree {
         let mut game = GameTree::new(19, 19);
         let current = game.current;
-        play_variation(&mut game, tree, current);
+        parse_variation(&mut game, tree, current);
         game
     }
 }
 
-fn play_variation(game: &mut GameTree, tree: &SgfTree, mut current: GameTreeIndex) {
+fn parse_variation(game: &mut GameTree, tree: &SgfTree, mut current: GameTreeIndex) {
     tree.nodes.iter().for_each(|node| {
         node.tokens.iter().for_each(|token| {
-            match game.consume_sgf_token(token, current) {
+            match game.parse_sgf_token(token, current) {
                 Err(e) => println!("Error parsing sgf token: {:?}, {:?}", token, e),
                 Ok(i) => current = i
             }
         });
     });
     tree.variations.iter().for_each(|variation| {
-        play_variation(game, &variation, current);
+        parse_variation(game, &variation, current);
     });
 }

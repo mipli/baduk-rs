@@ -28,16 +28,16 @@ impl Captures {
 }
 
 #[derive(Clone)]
-pub struct Goban {
+pub struct GameState {
     pub board: Vec<Intersection>,
     captures: Captures,
     width: usize,
     height: usize,
 }
 
-impl Goban {
-    pub fn new(width: usize, height: usize) -> Goban {
-        Goban {
+impl GameState {
+    pub fn new(width: usize, height: usize) -> GameState {
+        GameState {
             board: vec![None; width * height],
             captures: Captures::default(),
             width,
@@ -77,28 +77,28 @@ impl Goban {
         self.board[index].as_ref()
     }
 
-    pub fn place_stone(&self, pos: impl Into<Position>, color: Color) -> Result<Goban, Error> {
+    pub fn place_stone(&self, pos: impl Into<Position>, color: Color) -> Result<GameState, Error> {
         let pos = pos.into();
         if !self.is_valid_position(pos) {
             return Err(Error::InvalidPosition(pos));
         }
         let index = self.position_to_index(pos);
-        let mut goban = (*self).clone();
-        match goban.board[index] {
-            None => goban.board[index] = Some(color),
+        let mut state = (*self).clone();
+        match state.board[index] {
+            None => state.board[index] = Some(color),
             Some(_) => {
                 return Err(Error::AlreadyOccupied(pos));
             }
         }
-        Ok(goban)
+        Ok(state)
     }
 
-    pub fn add_stone(&self, pos: impl Into<Position>, color: Color) -> Result<Goban, Error> {
+    pub fn add_stone(&self, pos: impl Into<Position>, color: Color) -> Result<GameState, Error> {
         let pos = pos.into();
         let index = self.position_to_index(pos);
-        let mut goban = (*self).clone();
-        goban.board[index] = Some(color);
-        Ok(goban)
+        let mut state = (*self).clone();
+        state.board[index] = Some(color);
+        Ok(state)
     }
 
     pub fn remove_stone(&mut self, pos: impl Into<Position>) -> Result<(), Error> {
@@ -216,9 +216,9 @@ impl Goban {
     }
 }
 
-impl Default for Goban {
-    fn default() -> Goban {
-        Goban {
+impl Default for GameState {
+    fn default() -> GameState {
+        GameState {
             board: vec![None; 361],
             captures: Captures::default(),
             width: 19,
@@ -227,10 +227,10 @@ impl Default for Goban {
     }
 }
 
-impl std::str::FromStr for Goban {
+impl std::str::FromStr for GameState {
     type Err = Error;
 
-    fn from_str(data: &str) -> Result<Goban, Error> {
+    fn from_str(data: &str) -> Result<GameState, Error> {
         let board = data.chars().fold(vec![], |mut board, c| {
             match c {
                 '.' => board.push(None),
@@ -244,7 +244,7 @@ impl std::str::FromStr for Goban {
         if size * size != board.len() {
             Err(Error::InvalidInputSize)
         } else {
-            Ok(Goban {
+            Ok(GameState {
                 board,
                 captures: Captures::default(),
                 width: size,
@@ -254,7 +254,7 @@ impl std::str::FromStr for Goban {
     }
 }
 
-impl std::fmt::Debug for Goban {
+impl std::fmt::Debug for GameState {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let out =
             self.board
