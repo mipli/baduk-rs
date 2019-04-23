@@ -1,170 +1,191 @@
-use crate::{Goban, Error, Position, Color, SgfToken};
+use crate::{Goban, Captures, Error, Position, Color, SgfToken};
 use sgf_parser::{GameTree as SgfTree};
 
-type GameTreeIndex = usize;
+pub type GameTreeIndex = usize;
 
-struct GameTree {
-    root: GameTreeNode,
-    nodes: Vec<GameTreeNode>,
-    active: GameTreeIndex,
+#[derive(Debug, Clone)]
+pub struct GameTreeNode {
+    pub parent: Option<GameTreeIndex>,
+    pub state: Option<Goban>,
+    pub tokens: Vec<SgfToken>,
+    pub children: Vec<GameTreeIndex>,
+    pub performed_move: Option<PerformedMove>,
+    // active: bool -> used to indicate active branch
 }
 
-struct GameTreeNode {
-    parent: GameTreeIndex,
-    nodeId: GameTreeIndex,
-    goban: Goban,
-    tokens: Vec<SgfToken>,
-    children: Vec<GameTreeIndex>
+#[derive(Debug, Clone)]
+pub struct PerformedMove {
+    pub position: Position,
+    pub color: Color,
+    pub captures: Vec<Position>
+}
+
+impl GameTreeNode {
+    fn new() -> GameTreeNode {
+        GameTreeNode {
+            parent: None,
+            state: None,
+            tokens: vec![],
+            children: vec![],
+            performed_move: None,
+        }
+    }
 }
 
 #[derive(Debug)]
-struct Move {
-    position: Position,
-    color: Color,
-    captures: Vec<Position>
+pub struct GameTree {
+    pub root: GameTreeIndex,
+    pub nodes: Vec<GameTreeNode>,
+    pub current: GameTreeIndex,
 }
 
-#[derive(Debug)]
-enum Node {
-    Move(Move),
-    Empty
-}
-
-#[derive(Debug)]
-pub struct Game {
-    current: usize,
-    selected_variation: usize,
-    komi: f32,
-    nodes: Vec<(Node, Goban)>,
-    variations: Vec<Game>
-}
-
-impl Default for Game {
-    fn default() -> Game {
-        Game {
+impl Default for GameTree {
+    fn default() -> GameTree {
+        let root = GameTreeNode::new();
+        GameTree {
+            root: 0,
             current: 0,
-            selected_variation: 0,
-            komi: 6.5,
-            nodes: vec![(Node::Empty, Goban::default())],
-            variations: vec![]
+            nodes: vec![root]
         }
     }
 }
 
-impl Game {
-    pub fn count_moves(&self) -> usize {
-        let count = self.nodes
-            .iter()
-            .filter(|(node, _)| {
-                match node {
-                    Node::Move(_) => true,
-                    _ => false
+impl GameTree {
+    pub fn new(width: usize, height: usize) -> GameTree {
+        let mut root = GameTreeNode::new();
+        root.state = Some(Goban::new(width, height));
+        GameTree {
+            root: 0,
+            current: 0,
+            nodes: vec![root]
+        }
+    }
+
+    pub fn count_nodes(&self) -> usize {
+        self.nodes.len()
+    }
+
+    pub fn current_state(&self) -> Option<&Goban> {
+        self.nodes[self.current].state.as_ref()
+    }
+
+    pub fn create_board(&mut self, size: usize) {
+        self.nodes[self.current].state = Some(Goban::new(size, size));
+    }
+
+    fn add_move(&mut self, performed_move: PerformedMove, parent: GameTreeIndex, state: Goban) -> GameTreeIndex {
+        let new_id = self.nodes.len();
+        let new_node = GameTreeNode {
+            parent: Some(parent),
+            state: Some(state),
+            tokens: vec![SgfToken::Move {
+                color: performed_move.color,
+                coordinate: (performed_move.position.x() as u8, performed_move.position.y() as u8)
+            }],
+            children: vec![],
+            performed_move: Some(performed_move),
+        };
+        self.nodes[parent].children.push(new_id);
+        self.nodes.push(new_node);
+        self.current = new_id;
+        new_id
+    }
+
+    pub fn play_move(&mut self, pos: impl Into<Position>, color: Color) -> Result<GameTreeIndex, Error> {
+        self.play_move_as_variation(pos, color, self.current)
+    }
+
+    pub fn play_move_as_variation(&mut self, pos: impl Into<Position>, color: Color, parent: GameTreeIndex) -> Result<GameTreeIndex, Error> {
+        let pos = pos.into();
+        let current_node = &self.nodes[parent];
+
+        if self.is_directly_retaking_ko(pos, color) {
+            return Err(Error::RetakingKo);
+        }
+        match current_node.state {
+            None => Err(Error::MissingGoboard),
+            Some(ref current_state) => {
+                let mut state = current_state.place_stone(pos, color)?;
+                let removed = state.remove_dead_stones(!color);
+                let valid = state.is_valid();
+                if !valid {
+                    Err(Error::SuicidalMove)
+                } else {
+                    state.capture_stones(removed.len(), !color);
+                    let performed_move = PerformedMove {
+                        position: pos,
+                        color: color,
+                        captures: removed,
+                    };
+                    Ok(self.add_move(performed_move, parent, state))
                 }
-            })
-            .count();
-        let variation_count = self
-            .variations
-            .iter()
-            .map(|v| v.count_moves())
-            .max()
-            .unwrap_or(0);
-
-        count + variation_count
-    }
-
-    pub fn komi(&self) -> f32 {
-        self.komi
-    }
-
-    pub fn get_variation(&self, variation_index: usize) -> Option<&Game> {
-        self.variations.get(variation_index)
-    }
-
-    pub fn goban(&self) -> Option<&Goban> {
-        if self.current < self.nodes.len() {
-            Some(&self.nodes[self.current as usize].1)
-        } else {
-            None
+            }
         }
     }
 
-    pub fn add_stone(&mut self, pos: impl Into<Position>, color: Color) -> Result<&Goban, Error> {
+    pub fn add_stone(&mut self, pos: impl Into<Position>, color: Color) -> Result<GameTreeIndex, Error> {
         let pos = pos.into();
-        if self.is_directly_retaking_ko(pos, color) {
-            return Err(Error::RetakingKo);
-        }
-        let goban = self.goban().unwrap().add_stone(pos, color)?;
-        self.nodes[self.current].1 = goban;
-        Ok(&self.nodes[self.current].1)
-    }
+        let current_node = &self.nodes[self.current];
 
-    pub fn play_move(&mut self, pos: impl Into<Position>, color: Color) -> Result<&Goban, Error> {
-        let pos = pos.into();
-        if self.is_directly_retaking_ko(pos, color) {
-            return Err(Error::RetakingKo);
-        }
-        let mut goban = self.goban().unwrap().place_stone(pos, color)?;
-        let removed = goban.remove_dead_stones(!color);
-        let valid = goban.is_valid();
-        if !valid {
-            Err(Error::SuicidalMove)
-        } else {
-            goban.capture_stones(removed.len(), !color);
-
-            self.nodes.push((Node::Move(Move {
-                position: pos,
-                color: color,
-                captures: removed
-            }), goban));
-            self.current += 1;
-            Ok(&self.nodes[self.current].1)
+        match current_node.state {
+            None => Err(Error::MissingGoboard),
+            Some(ref current_state) => {
+                let state = current_state.add_stone(pos, color)?;
+                let performed_move = PerformedMove {
+                    position: pos,
+                    color: color,
+                    captures: vec![],
+                };
+                Ok(self.add_move(performed_move, self.current, state))
+            }
         }
     }
 
-    fn is_directly_retaking_ko(&self, pos: impl Into<Position>, color: Color) -> bool {
-        let pos = pos.into();
-        match self.nodes.last() {
-            Some((Node::Move(m), _)) => {
-                m.color == !color && m.captures.len() == 1 && m.captures[0] == pos
+    fn is_directly_retaking_ko(&self, pos: Position, color: Color) -> bool {
+        match self.nodes[self.current].performed_move {
+            Some(ref performed_move) => {
+                performed_move.color == !color && performed_move.captures.len() == 1 && performed_move.captures[0] == pos
             },
-            _ => false,
+            None => {
+               false
+            }
         }
+    }
+
+    pub fn consume_sgf_token(&mut self, token: &SgfToken, node: GameTreeIndex) -> Result<GameTreeIndex, Error> {
+        let index = match token {
+            SgfToken::Move{color, coordinate} => {
+                self.play_move_as_variation(*coordinate, *color, node)?
+            },
+            SgfToken::Add{color, coordinate} => {
+                self.add_stone(*coordinate, *color)?
+            },
+            _ => node
+        };
+        self.nodes[node].tokens.push(token.clone());
+        Ok(index)
     }
 }
 
-impl From<&SgfTree> for Game {
-    fn from(tree: &SgfTree) -> Game {
-        let mut game = Game::default();
-        tree.nodes.iter().for_each(|node| {
-            node.tokens.iter().for_each(|token| {
-                match token {
-                    SgfToken::Move{color, coordinate} => {
-                        match game.play_move(*coordinate, *color) {
-                            Err(e) => {
-                                println!("Error parsing sgf token: {:?}, {:?}", token, e);
-                            },
-                            _ => {}
-
-                        }
-                    },
-                    SgfToken::Add{color, coordinate} => {
-                        match game.add_stone(*coordinate, *color) {
-                            Err(e) => {
-                                println!("Error parsing sgf token: {:?}, {:?}", token, e);
-                            },
-                            _ => {}
-
-                        }
-                    },
-                    _ => {}
-
-                }
-            });
-        });
-        tree.variations.iter().for_each(|variation| {
-            let g: Game = variation.into();
-            game.variations.push(g);
-        });
+impl From<&SgfTree> for GameTree {
+    fn from(tree: &SgfTree) -> GameTree {
+        let mut game = GameTree::new(19, 19);
+        let current = game.current;
+        play_variation(&mut game, tree, current);
         game
     }
+}
+
+fn play_variation(game: &mut GameTree, tree: &SgfTree, mut current: GameTreeIndex) {
+    tree.nodes.iter().for_each(|node| {
+        node.tokens.iter().for_each(|token| {
+            match game.consume_sgf_token(token, current) {
+                Err(e) => println!("Error parsing sgf token: {:?}, {:?}", token, e),
+                Ok(i) => current = i
+            }
+        });
+    });
+    tree.variations.iter().for_each(|variation| {
+        play_variation(game, &variation, current);
+    });
 }

@@ -9,7 +9,8 @@ pub enum Error {
     AlreadyOccupied(Position),
     InvalidInputSize,
     SuicidalMove,
-    RetakingKo
+    RetakingKo,
+    MissingGoboard
 }
 
 impl fmt::Display for Error {
@@ -22,7 +23,8 @@ impl fmt::Display for Error {
             AlreadyOccupied(pos) => write!(f, "{}: ({})", self.description(), pos),
             InvalidInputSize => write!(f, "{}", self.description()),
             SuicidalMove => write!(f, "{}", self.description()),
-            RetakingKo => write!(f, "{}", self.description())
+            RetakingKo => write!(f, "{}", self.description()),
+            MissingGoboard => write!(f, "{}", self.description()),
         }
     }
 }
@@ -36,7 +38,8 @@ impl error::Error for Error {
             AlreadyOccupied(_) => "Position was already occupied",
             InvalidInputSize => "Input was not square size",
             SuicidalMove => "Suicide is not allowed",
-            RetakingKo => "Cannot retake ko at once"
+            RetakingKo => "Cannot retake ko at once",
+            MissingGoboard => "Missing goboard definition",
         }
     }
 }

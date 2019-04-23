@@ -3,7 +3,7 @@ use std::collections::HashSet;
 
 type Intersection = Option<Color>;
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Captures {
     pub white: usize,
     pub black: usize
@@ -29,7 +29,7 @@ impl Captures {
 
 #[derive(Clone)]
 pub struct Goban {
-    board: Vec<Intersection>,
+    pub board: Vec<Intersection>,
     captures: Captures,
     width: usize,
     height: usize,
