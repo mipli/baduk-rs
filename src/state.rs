@@ -42,9 +42,9 @@ impl GameStateDifference {
 #[derive(Clone)]
 pub struct GameState {
     pub board: Vec<Intersection>,
-    captures: Captures,
-    width: usize,
-    height: usize,
+    pub captures: Captures,
+    pub width: usize,
+    pub height: usize,
 }
 
 impl GameState {

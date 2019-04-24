@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod game_tests {
-    use baduk_rs::{GameTree, Color, Error};
+    use baduk_rs::{GameTree, GameState, Color, Error};
     use sgf_parser::{parse};
 
     #[test]
@@ -8,6 +8,26 @@ mod game_tests {
         let game = GameTree::default();
         assert_eq!(game.count_nodes(), 1);
         assert!(game.current_state().is_none());
+    }
+
+    #[test]
+    fn it_can_create_new_game_from_game_state() {
+        let state: GameState = "
+        .x...
+        x..x.
+        .xoox
+        .oxx.
+        .o..."
+            .parse()
+            .unwrap();
+        let tree: GameTree = state.into();
+        assert_eq!(tree.nodes.len(), 1);
+        if let Some(state) = tree.current_state() {
+            assert_eq!(state.get_stone((2, 1)), Some(&Color::Black));
+            assert_eq!(state.get_stone((2, 5)), Some(&Color::White));
+        } else {
+            assert!(false);
+        }
     }
 
     #[test]
@@ -163,9 +183,9 @@ mod game_tests {
 
     #[test]
     fn it_can_create_new_game_from_sgf_with_added_stones() {
-        let tree = parse("(;W[ba];W[ab];AB[aa])").unwrap();
+        let tree = parse("(;W[ba];W[ab]AB[aa])").unwrap();
         let game: GameTree = (&tree).into();
-        assert_eq!(game.count_nodes(), 4);
+        assert_eq!(game.count_nodes(), 3);
         let state = game.current_state().unwrap();
         println!("{:?}", state);
         assert!(!state.is_valid());

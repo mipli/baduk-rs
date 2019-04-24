@@ -116,11 +116,13 @@ impl GameTree {
             None => Err(Error::MissingGoboard),
             Some(ref current_state) => {
                 let state = current_state.add_stone(pos, color)?;
-                let tokens = vec![SgfToken::Add {
-                    coordinate: pos.into(),
-                    color,
-                }];
-                Ok(self.add_node(self.current, tokens, state))
+                self.nodes[self.current].tokens.push(
+                    SgfToken::Add {
+                        coordinate: pos.into(),
+                        color,
+                    });
+                self.nodes[self.current].state = Some(state);
+                Ok(self.current)
             }
         }
     }
@@ -183,4 +185,18 @@ fn parse_variation(game: &mut GameTree, tree: &SgfTree, mut current: GameTreeInd
     tree.variations.iter().for_each(|variation| {
         parse_variation(game, &variation, current);
     });
+}
+
+impl From<GameState> for GameTree {
+    fn from(state: GameState) -> GameTree {
+        let mut game = GameTree::new(state.width, state.height);
+        for x in 1..=state.width {
+            for y in 1..=state.height {
+                if let Some(color) = state.get_stone((x, y)) {
+                    let _ = game.add_stone((x, y), *color);
+                }
+            }
+        }
+        game
+    }
 }
