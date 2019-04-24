@@ -5,8 +5,8 @@ type Intersection = Option<Color>;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Captures {
-    pub white: usize,
-    pub black: usize
+    pub white: i32,
+    pub black: i32
 }
 
 impl Default for Captures {
@@ -19,11 +19,23 @@ impl Default for Captures {
 }
 
 impl Captures {
-    fn capture_stones(&mut self, count: usize, color: Color) {
+    fn capture_stones(&mut self, count: i32, color: Color) {
         match color {
             Color::Black => self.black += count,
             Color::White => self.white += count
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct GameStateDifference {
+    pub positions: Vec<Position>,
+    pub captures: Captures
+}
+
+impl GameStateDifference {
+    pub fn is_empty(&self) -> bool {
+        self.positions.len() == 0 && self.captures.white == 0 && self.captures.black == 0
     }
 }
 
@@ -45,7 +57,28 @@ impl GameState {
         }
     }
 
-    pub fn capture_stones(&mut self, count: usize, color: Color) {
+    pub fn difference(&self, other: &GameState) -> Result<GameStateDifference, ()> {
+        if self.width != other.width || self.height != other.height {
+            return Err(());
+        }
+        let mut diff = vec![];
+        for x in 1..=self.width {
+            for y in 1..=self.height {
+                if self.get_stone((x, y)) != other.get_stone((x, y)) {
+                    diff.push((x, y).into());
+                }
+            }
+        }
+        Ok(GameStateDifference {
+            positions: diff,
+            captures: Captures {
+                black: (self.captures.black - other.captures.black).abs(),
+                white: (self.captures.white - other.captures.white).abs(),
+            }
+        })
+    }
+
+    pub fn capture_stones(&mut self, count: i32, color: Color) {
         self.captures.capture_stones(count, color);
     }
 

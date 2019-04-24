@@ -9,15 +9,7 @@ pub struct GameTreeNode {
     pub state: Option<GameState>,
     pub tokens: Vec<SgfToken>,
     pub children: Vec<GameTreeIndex>,
-    pub performed_move: Option<PerformedMove>,
     // active: bool -> used to indicate active branch
-}
-
-#[derive(Debug, Clone)]
-pub struct PerformedMove {
-    pub position: Position,
-    pub color: Color,
-    pub captures: Vec<Position>
 }
 
 impl GameTreeNode {
@@ -27,7 +19,6 @@ impl GameTreeNode {
             state: None,
             tokens: vec![],
             children: vec![],
-            performed_move: None,
         }
     }
 }
@@ -73,17 +64,13 @@ impl GameTree {
         self.nodes[self.current].state = Some(GameState::new(size, size));
     }
 
-    fn add_move(&mut self, performed_move: PerformedMove, parent: GameTreeIndex, state: GameState) -> GameTreeIndex {
+    fn add_node(&mut self, parent: GameTreeIndex, tokens: Vec<SgfToken>, state: GameState) -> GameTreeIndex {
         let new_id = self.nodes.len();
         let new_node = GameTreeNode {
             parent: Some(parent),
             state: Some(state),
-            tokens: vec![SgfToken::Move {
-                color: performed_move.color,
-                coordinate: (performed_move.position.x() as u8, performed_move.position.y() as u8)
-            }],
+            tokens,
             children: vec![],
-            performed_move: Some(performed_move),
         };
         self.nodes[parent].children.push(new_id);
         self.nodes.push(new_node);
@@ -98,10 +85,6 @@ impl GameTree {
     pub fn play_move_as_variation(&mut self, pos: impl Into<Position>, color: Color, parent: GameTreeIndex) -> Result<GameTreeIndex, Error> {
         let pos = pos.into();
         let current_node = &self.nodes[parent];
-
-        if self.is_directly_retaking_ko(pos, color) {
-            return Err(Error::RetakingKo);
-        }
         match current_node.state {
             None => Err(Error::MissingGoboard),
             Some(ref current_state) => {
@@ -111,13 +94,15 @@ impl GameTree {
                 if !valid {
                     Err(Error::SuicidalMove)
                 } else {
-                    state.capture_stones(removed.len(), !color);
-                    let performed_move = PerformedMove {
-                        position: pos,
-                        color: color,
-                        captures: removed,
-                    };
-                    Ok(self.add_move(performed_move, parent, state))
+                    if self.is_directly_retaking_ko(color, &state) {
+                        return Err(Error::RetakingKo);
+                    }
+                    state.capture_stones(removed.len() as i32, !color);
+                    let tokens = vec![SgfToken::Move {
+                        coordinate: pos.into(),
+                        color,
+                    }];
+                    Ok(self.add_node(parent, tokens, state))
                 }
             }
         }
@@ -131,24 +116,35 @@ impl GameTree {
             None => Err(Error::MissingGoboard),
             Some(ref current_state) => {
                 let state = current_state.add_stone(pos, color)?;
-                let performed_move = PerformedMove {
-                    position: pos,
-                    color: color,
-                    captures: vec![],
-                };
-                Ok(self.add_move(performed_move, self.current, state))
+                let tokens = vec![SgfToken::Add {
+                    coordinate: pos.into(),
+                    color,
+                }];
+                Ok(self.add_node(self.current, tokens, state))
             }
         }
     }
 
-    fn is_directly_retaking_ko(&self, pos: Position, color: Color) -> bool {
-        match self.nodes[self.current].performed_move {
-            Some(ref performed_move) => {
-                performed_move.color == !color && performed_move.captures.len() == 1 && performed_move.captures[0] == pos
-            },
-            None => {
-               false
+    fn is_directly_retaking_ko(&self, color: Color, new_state: &GameState) -> bool {
+        if let Some(parent_id) = self.nodes[self.current].parent {
+            if let Some(ref parent_state) = self.nodes[parent_id].state {
+                if let Ok(diff) = parent_state.difference(new_state) {
+                    if diff.positions.len() != 0 {
+                        false
+                    } else {
+                        match color {
+                            Color::Black => diff.captures.white == 0 && diff.captures.black == 1,
+                            Color::White => diff.captures.black == 0 && diff.captures.white == 1,
+                        }
+                    }
+                } else  {
+                    false
+                }
+            } else {
+                false
             }
+        } else {
+            false
         }
     }
 
@@ -162,7 +158,6 @@ impl GameTree {
             },
             _ => node
         };
-        self.nodes[node].tokens.push(token.clone());
         Ok(index)
     }
 }

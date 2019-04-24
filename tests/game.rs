@@ -27,6 +27,12 @@ mod game_tests {
         assert_eq!(captures.white, 0);
         assert_eq!(captures.black, 0);
 
+        assert_eq!(game.nodes[0].tokens.len(), 0);
+        assert_eq!(game.nodes[1].tokens.len(), 1);
+        assert_eq!(game.nodes[2].tokens.len(), 1);
+        assert_eq!(game.nodes[3].tokens.len(), 1);
+        assert_eq!(game.nodes[4].tokens.len(), 1);
+
         assert_eq!(state.get_stone((4, 3)), Some(&Color::Black));
         assert_eq!(state.get_stone((16, 16)), Some(&Color::White));
         assert_eq!(state.get_stone((16, 4)), Some(&Color::Black));
@@ -72,33 +78,76 @@ mod game_tests {
 
     #[test]
     fn it_handles_ko() {
-        let mut game = GameTree::new(19, 19);
-        let _ = game.play_move((1, 1), Color::Black);
-        let _ = game.play_move((1, 2), Color::White);
-        let _ = game.play_move((2, 2), Color::Black);
-        let _ = game.play_move((2, 1), Color::White);
+        let mut game = GameTree::new(5, 5);
+        let _ = game.play_move((2, 1), Color::Black);
+        let _ = game.play_move((1, 2), Color::Black);
+        let _ = game.play_move((2, 3), Color::Black);
+        let _ = game.play_move((3, 1), Color::White);
+        let _ = game.play_move((4, 2), Color::White);
+        let _ = game.play_move((3, 3), Color::White);
+        let _ = game.play_move((3, 2), Color::Black);
 
-        assert_eq!(game.count_nodes(), 5);
+        let captures = game.current_state().unwrap().captures();
+        assert_eq!(captures.white, 0);
+        assert_eq!(captures.black, 0);
+
+        let _ = game.play_move((2, 2), Color::White);
 
         let captures = game.current_state().unwrap().captures();
         assert_eq!(captures.white, 0);
         assert_eq!(captures.black, 1);
 
-        let err = game.play_move((1, 1), Color::Black);
+        let err = game.play_move((3, 2), Color::Black);
         match err {
             Err(Error::RetakingKo) => assert!(true),
             _ => assert!(false),
         }
-        assert_eq!(game.count_nodes(), 5);
 
-        let _ = game.play_move((3, 1), Color::Black);
-        let _ = game.play_move((6, 6), Color::White);
-        let res = game.play_move((1, 1), Color::Black);
+        let _ = game.play_move((4, 4), Color::Black);
+        let _ = game.play_move((5, 5), Color::White);
+        let res = game.play_move((3, 2), Color::Black);
         assert!(res.is_ok());
-        assert_eq!(game.count_nodes(), 8);
 
         let captures = game.current_state().unwrap().captures();
         assert_eq!(captures.white, 1);
+        assert_eq!(captures.black, 1);
+    }
+
+    #[test]
+    fn it_handles_almost_ko() {
+        let mut game = GameTree::new(7, 7);
+        let _ = game.play_move((1, 2), Color::Black);
+        let _ = game.play_move((2, 1), Color::Black);
+        let _ = game.play_move((3, 1), Color::Black);
+        let _ = game.play_move((2, 3), Color::Black);
+        let _ = game.play_move((3, 3), Color::Black);
+
+        let _ = game.play_move((2, 2), Color::White);
+        let _ = game.play_move((3, 2), Color::White);
+        let _ = game.play_move((4, 1), Color::White);
+        let _ = game.play_move((4, 3), Color::White);
+        let _ = game.play_move((5, 2), Color::White);
+
+        let _ = game.play_move((4, 2), Color::Black);
+
+        let captures = game.current_state().unwrap().captures();
+        assert_eq!(captures.white, 2);
+        assert_eq!(captures.black, 0);
+
+        let res = game.play_move((3, 2), Color::White);
+        assert!(res.is_ok());
+
+        let captures = game.current_state().unwrap().captures();
+        assert_eq!(captures.white, 2);
+        assert_eq!(captures.black, 1);
+
+        let res = game.play_move((2, 2), Color::White);
+        assert!(res.is_ok());
+
+        let _ = game.play_move((4, 2), Color::Black);
+
+        let captures = game.current_state().unwrap().captures();
+        assert_eq!(captures.white, 4);
         assert_eq!(captures.black, 1);
     }
 

@@ -25,6 +25,12 @@ impl From<(u8, u8)> for Position {
     }
 }
 
+impl From<Position> for (u8, u8) {
+    fn from(pos: Position) -> (u8, u8) {
+        (pos.x() as u8, pos.y() as u8)
+    }
+}
+
 impl From<(i32, i32)> for Position {
     fn from(pos: (i32, i32)) -> Position {
         Position(pos.0 as usize, pos.1 as usize)

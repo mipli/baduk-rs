@@ -148,4 +148,32 @@ mod state_tests {
             .unwrap();
         assert!(!state.is_valid());
     }
+
+    #[test]
+    fn it_can_get_difference() {
+        let a: GameState = "
+        o....
+        x..x.
+        .xoox
+        .oxx.
+        .o..."
+            .parse()
+            .unwrap();
+
+        let b: GameState = "
+        .x...
+        x..x.
+        .xoox
+        .oxx.
+        .o..."
+            .parse()
+            .unwrap();
+
+        let diff = a.difference(&b);
+        assert!(diff.is_ok());
+        let diff = diff.unwrap();
+        assert_eq!(diff.positions.len(), 2);
+        assert_eq!(diff.positions[0], (1, 1).into());
+        assert_eq!(diff.positions[1], (2, 1).into());
+    }
 }
