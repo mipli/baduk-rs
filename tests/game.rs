@@ -98,14 +98,15 @@ mod game_tests {
 
     #[test]
     fn it_handles_ko() {
-        let mut game = GameTree::new(5, 5);
-        let _ = game.play_move((2, 1), Color::Black);
-        let _ = game.play_move((1, 2), Color::Black);
-        let _ = game.play_move((2, 3), Color::Black);
-        let _ = game.play_move((3, 1), Color::White);
-        let _ = game.play_move((4, 2), Color::White);
-        let _ = game.play_move((3, 3), Color::White);
-        let _ = game.play_move((3, 2), Color::Black);
+        let state: GameState = "
+        .xo..
+        x.xo.
+        .xo..
+        .....
+        ....."
+            .parse()
+            .unwrap();
+        let mut game: GameTree = state.into();
 
         let captures = game.current_state().unwrap().captures();
         assert_eq!(captures.white, 0);
@@ -135,18 +136,17 @@ mod game_tests {
 
     #[test]
     fn it_handles_almost_ko() {
-        let mut game = GameTree::new(7, 7);
-        let _ = game.play_move((1, 2), Color::Black);
-        let _ = game.play_move((2, 1), Color::Black);
-        let _ = game.play_move((3, 1), Color::Black);
-        let _ = game.play_move((2, 3), Color::Black);
-        let _ = game.play_move((3, 3), Color::Black);
-
-        let _ = game.play_move((2, 2), Color::White);
-        let _ = game.play_move((3, 2), Color::White);
-        let _ = game.play_move((4, 1), Color::White);
-        let _ = game.play_move((4, 3), Color::White);
-        let _ = game.play_move((5, 2), Color::White);
+        let state: GameState = "
+        .xxo...
+        xoo.o..
+        .xxo...
+        .......
+        .......
+        .......
+        ......."
+            .parse()
+            .unwrap();
+        let mut game: GameTree = state.into();
 
         let _ = game.play_move((4, 2), Color::Black);
 
