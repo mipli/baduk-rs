@@ -56,6 +56,10 @@ impl GameTree {
         self.nodes.len()
     }
 
+    pub fn get_node(&self, node: GameTreeIndex) -> Option<&GameTreeNode> {
+        self.nodes.get(node)
+    }
+
     pub fn current_state(&self) -> Option<&GameState> {
         self.nodes[self.current].state.as_ref()
     }
@@ -70,6 +74,20 @@ impl GameTree {
             parent: Some(parent),
             state: Some(state),
             tokens,
+            children: vec![],
+        };
+        self.nodes[parent].children.push(new_id);
+        self.nodes.push(new_node);
+        self.current = new_id;
+        new_id
+    }
+
+    pub fn create_new_node(&mut self, parent: GameTreeIndex) -> GameTreeIndex {
+        let new_id = self.nodes.len();
+        let new_node = GameTreeNode {
+            parent: Some(parent),
+            state: self.nodes[parent].state.clone(),
+            tokens: vec![],
             children: vec![],
         };
         self.nodes[parent].children.push(new_id);
@@ -108,20 +126,50 @@ impl GameTree {
         }
     }
 
-    pub fn add_stone(&mut self, pos: impl Into<Position>, color: Color) -> Result<GameTreeIndex, Error> {
+    fn play_move_on_node(&mut self, pos: impl Into<Position>, color: Color, node: GameTreeIndex) -> Result<GameTreeIndex, Error> {
         let pos = pos.into();
-        let current_node = &self.nodes[self.current];
+        match self.nodes[node].state {
+            None => Err(Error::MissingGoboard),
+            Some(ref current_state) => {
+                let mut state = current_state.place_stone(pos, color)?;
+                let removed = state.remove_dead_stones(!color);
+                let valid = state.is_valid();
+                if !valid {
+                    Err(Error::SuicidalMove)
+                } else {
+                    if self.is_directly_retaking_ko(color, &state) {
+                        return Err(Error::RetakingKo);
+                    }
+                    state.capture_stones(removed.len() as i32, !color);
+                    self.nodes[node].tokens.push(SgfToken::Move {
+                        coordinate: pos.into(),
+                        color,
+                    });
+                    self.nodes[node].state = Some(state);
+                    Ok(node)
+                }
+            }
+        }
+    }
+
+    pub fn add_stone(&mut self, pos: impl Into<Position>, color: Color) -> Result<GameTreeIndex, Error> {
+        self.add_stone_on_node(pos, color, self.current)
+    }
+
+    pub fn add_stone_on_node(&mut self, pos: impl Into<Position>, color: Color, node: GameTreeIndex) -> Result<GameTreeIndex, Error> {
+        let pos = pos.into();
+        let current_node = &self.nodes[node];
 
         match current_node.state {
             None => Err(Error::MissingGoboard),
             Some(ref current_state) => {
                 let state = current_state.add_stone(pos, color)?;
-                self.nodes[self.current].tokens.push(
+                self.nodes[node].tokens.push(
                     SgfToken::Add {
                         coordinate: pos.into(),
                         color,
                     });
-                self.nodes[self.current].state = Some(state);
+                self.nodes[node].state = Some(state);
                 Ok(self.current)
             }
         }
@@ -150,15 +198,23 @@ impl GameTree {
         }
     }
 
+    pub fn add_token(&mut self, node: GameTreeIndex, token: &SgfToken) -> GameTreeIndex {
+        self.nodes[node].tokens.push(token.clone());
+        node
+    }
+
     pub fn parse_sgf_token(&mut self, token: &SgfToken, node: GameTreeIndex) -> Result<GameTreeIndex, Error> {
         let index = match token {
             SgfToken::Move{color, coordinate} => {
-                self.play_move_as_variation(*coordinate, *color, node)?
+                self.play_move_on_node(*coordinate, *color, node)?
             },
             SgfToken::Add{color, coordinate} => {
-                self.add_stone(*coordinate, *color)?
+                self.add_stone_on_node(*coordinate, *color, node)?
             },
-            _ => node
+            _ => {
+                self.add_token(node, token);
+                node
+            }
         };
         Ok(index)
     }
@@ -175,10 +231,11 @@ impl From<&SgfTree> for GameTree {
 
 fn parse_variation(game: &mut GameTree, tree: &SgfTree, mut current: GameTreeIndex) {
     tree.nodes.iter().for_each(|node| {
+        current = game.create_new_node(current);
         node.tokens.iter().for_each(|token| {
             match game.parse_sgf_token(token, current) {
                 Err(e) => println!("Error parsing sgf token: {:?}, {:?}", token, e),
-                Ok(i) => current = i
+                _ => {}
             }
         });
     });

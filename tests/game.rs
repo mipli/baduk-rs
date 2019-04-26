@@ -187,7 +187,6 @@ mod game_tests {
         let game: GameTree = (&tree).into();
         assert_eq!(game.count_nodes(), 3);
         let state = game.current_state().unwrap();
-        println!("{:?}", state);
         assert!(!state.is_valid());
         let captures = state.captures();
         assert_eq!(captures.white, 0);
@@ -210,7 +209,7 @@ mod game_tests {
 
     #[test]
     fn it_can_create_new_game_from_sgf_with_variation() {
-        let tree = parse("(;B[aa];W[bb](;B[cc])(;B[kk]W[qq]))").unwrap();
+        let tree = parse("(;B[aa];W[bb](;B[cc])(;B[kk];W[qq]))").unwrap();
         let game: GameTree = (&tree).into();
         assert_eq!(game.count_nodes(), 6);
         assert_eq!(game.nodes[0].children.len(), 1);
@@ -220,5 +219,24 @@ mod game_tests {
         assert_eq!(game.nodes[4].children.len(), 1);
         assert_eq!(game.nodes[4].children.len(), 1);
         assert_eq!(game.nodes[5].children.len(), 0);
+    }
+
+    #[test]
+    fn it_stores_all_tokens() {
+        let tree = parse("(;W[ba]C[foobar];W[ab]AB[ca];CR[2019]B[ee])").unwrap();
+        let game: GameTree = (&tree).into();
+        assert_eq!(game.count_nodes(), 4);
+
+        let node = game.get_node(0).unwrap();
+        assert_eq!(node.tokens.len(), 0);
+
+        let node = game.get_node(1).unwrap();
+        assert_eq!(node.tokens.len(), 2);
+
+        let node = game.get_node(2).unwrap();
+        assert_eq!(dbg!(&node.tokens).len(), 2);
+
+        let node = game.get_node(3).unwrap();
+        assert_eq!(node.tokens.len(), 2);
     }
 }
