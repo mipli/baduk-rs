@@ -42,8 +42,9 @@ impl Default for GameTree {
 }
 
 impl GameTree {
-    pub fn new(width: usize, height: usize) -> GameTree {
+    pub fn new(width: u32, height: u32) -> GameTree {
         let mut root = GameTreeNode::new();
+        root.tokens.push(SgfToken::Size(width, height));
         root.state = Some(GameState::new(width, height));
         GameTree {
             root: 0,
@@ -62,10 +63,6 @@ impl GameTree {
 
     pub fn current_state(&self) -> Option<&GameState> {
         self.nodes[self.current].state.as_ref()
-    }
-
-    pub fn create_board(&mut self, size: usize) {
-        self.nodes[self.current].state = Some(GameState::new(size, size));
     }
 
     fn add_node(&mut self, parent: GameTreeIndex, tokens: Vec<SgfToken>, state: GameState) -> GameTreeIndex {
@@ -179,28 +176,29 @@ impl GameTree {
         if let Some(parent_id) = self.nodes[self.current].parent {
             if let Some(ref parent_state) = self.nodes[parent_id].state {
                 if let Ok(diff) = parent_state.difference(new_state) {
-                    if diff.positions.len() != 0 {
-                        false
-                    } else {
-                        match color {
-                            Color::Black => diff.captures.white == 0 && diff.captures.black == 1,
-                            Color::White => diff.captures.black == 0 && diff.captures.white == 1,
-                        }
+                    return match color {
+                        Color::Black => diff.captures.white == 0 && diff.captures.black == 1,
+                        Color::White => diff.captures.black == 0 && diff.captures.white == 1,
                     }
-                } else  {
-                    false
                 }
-            } else {
-                false
             }
-        } else {
-            false
         }
+        false
     }
 
     pub fn add_token(&mut self, node: GameTreeIndex, token: &SgfToken) -> GameTreeIndex {
         self.nodes[node].tokens.push(token.clone());
         node
+    }
+
+    pub fn set_size(&mut self, width: u32, height: u32, node: GameTreeIndex) -> Result<GameTreeIndex, Error> {
+        if node != self.root {
+            Err(Error::InvalidRootNode)
+        } else {
+            self.nodes[node].tokens.push(SgfToken::Size(width, height));
+            self.nodes[node].state = Some(GameState::new(width, height));
+            Ok(node)
+        }
     }
 
     pub fn parse_sgf_token(&mut self, token: &SgfToken, node: GameTreeIndex) -> Result<GameTreeIndex, Error> {
@@ -210,6 +208,10 @@ impl GameTree {
             },
             SgfToken::Add{color, coordinate} => {
                 self.add_stone_on_node(*coordinate, *color, node)?
+            },
+            SgfToken::Size(width, height) => {
+                let _ = self.set_size(*width, *height, node)?;
+                node
             },
             _ => {
                 self.add_token(node, token);
@@ -222,20 +224,21 @@ impl GameTree {
 
 impl From<&SgfTree> for GameTree {
     fn from(tree: &SgfTree) -> GameTree {
-        let mut game = GameTree::new(19, 19);
-        let current = game.current;
-        parse_variation(&mut game, tree, current);
+        let mut game = GameTree::default();
+        parse_variation(&mut game, tree, None);
         game
     }
 }
 
-fn parse_variation(game: &mut GameTree, tree: &SgfTree, mut current: GameTreeIndex) {
+fn parse_variation(game: &mut GameTree, tree: &SgfTree, mut current: Option<GameTreeIndex>) {
     tree.nodes.iter().for_each(|node| {
-        current = game.create_new_node(current);
+        current = match current {
+            None => Some(game.current),
+            Some(node) => Some(game.create_new_node(node))
+        };
         node.tokens.iter().for_each(|token| {
-            match game.parse_sgf_token(token, current) {
-                Err(e) => println!("Error parsing sgf token: {:?}, {:?}", token, e),
-                _ => {}
+            if let Err(e) = game.parse_sgf_token(token, current.expect("previous statement guarentees no-None value")) {
+                println!("Error parsing sgf token: {:?}, {:?}", token, e);
             }
         });
     });

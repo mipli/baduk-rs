@@ -43,14 +43,14 @@ impl GameStateDifference {
 pub struct GameState {
     pub board: Vec<Intersection>,
     pub captures: Captures,
-    pub width: usize,
-    pub height: usize,
+    pub width: u32,
+    pub height: u32,
 }
 
 impl GameState {
-    pub fn new(width: usize, height: usize) -> GameState {
+    pub fn new(width: u32, height: u32) -> GameState {
         GameState {
-            board: vec![None; width * height],
+            board: vec![None; (width * height) as usize],
             captures: Captures::default(),
             width,
             height,
@@ -86,7 +86,7 @@ impl GameState {
         &self.captures
     }
 
-    pub fn dimensions(&self) -> (usize, usize) {
+    pub fn dimensions(&self) -> (u32, u32) {
         (self.width, self.height)
     }
 
@@ -144,7 +144,7 @@ impl GameState {
         Ok(())
     }
 
-    pub fn count_liberties(&self, pos: impl Into<Position>) -> Option<usize> {
+    pub fn count_liberties(&self, pos: impl Into<Position>) -> Option<u32> {
         let pos = pos.into();
         if !self.is_valid_position(pos) {
             return None;
@@ -227,7 +227,7 @@ impl GameState {
     #[inline(always)]
     fn position_to_index(&self, pos: impl Into<Position>) -> usize {
         let pos = pos.into();
-        (pos.x() - 1) + ((pos.y() - 1) * self.width)
+        ((pos.x() - 1) + ((pos.y() - 1) * self.width)) as usize
     }
 
     fn get_neighbours(&self, pos: impl Into<Position>) -> Vec<Position> {
@@ -273,8 +273,8 @@ impl std::str::FromStr for GameState {
             }
             board
         });
-        let size = (board.len() as f64).sqrt() as usize;
-        if size * size != board.len() {
+        let size = (board.len() as f64).sqrt() as u32;
+        if size * size != (board.len() as u32) {
             Err(Error::InvalidInputSize)
         } else {
             Ok(GameState {
@@ -294,7 +294,7 @@ impl std::fmt::Debug for GameState {
                 .iter()
                 .enumerate()
                 .fold(String::new(), |mut out, (idx, intersection)| {
-                    if idx > 0 && idx % self.width == 0 {
+                    if idx > 0 && (idx as u32) % self.width == 0 {
                         out.push_str("\n");
                     }
                     let sym = match intersection {

@@ -1,27 +1,27 @@
 use std::fmt;
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug, Hash)]
-pub struct Position(usize, usize);
+pub struct Position(u32, u32);
 
 impl Position {
-    pub fn x(&self) -> usize {
+    pub fn x(&self) -> u32 {
         self.0
     }
 
-    pub fn y(&self) -> usize {
+    pub fn y(&self) -> u32 {
         self.1
     }
 }
 
-impl From<(usize, usize)> for Position {
-    fn from(pos: (usize, usize)) -> Position {
+impl From<(u32, u32)> for Position {
+    fn from(pos: (u32, u32)) -> Position {
         Position(pos.0, pos.1)
     }
 }
 
 impl From<(u8, u8)> for Position {
     fn from(pos: (u8, u8)) -> Position {
-        Position(pos.0 as usize, pos.1 as usize)
+        Position(pos.0 as u32, pos.1 as u32)
     }
 }
 
@@ -33,7 +33,7 @@ impl From<Position> for (u8, u8) {
 
 impl From<(i32, i32)> for Position {
     fn from(pos: (i32, i32)) -> Position {
-        Position(pos.0 as usize, pos.1 as usize)
+        Position(pos.0 as u32, pos.1 as u32)
     }
 }
 
@@ -46,7 +46,7 @@ impl From<&str> for Position {
             x -= 1;
         }
         let y = number.parse().unwrap();
-        Position(x as usize, y)
+        Position(x as u32, y)
     }
 }
 

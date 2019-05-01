@@ -10,7 +10,8 @@ pub enum Error {
     InvalidInputSize,
     SuicidalMove,
     RetakingKo,
-    MissingGoboard
+    MissingGoboard,
+    InvalidRootNode
 }
 
 impl fmt::Display for Error {
@@ -25,6 +26,7 @@ impl fmt::Display for Error {
             SuicidalMove => write!(f, "{}", self.description()),
             RetakingKo => write!(f, "{}", self.description()),
             MissingGoboard => write!(f, "{}", self.description()),
+            InvalidRootNode => write!(f, "{}", self.description()),
         }
     }
 }
@@ -40,6 +42,7 @@ impl error::Error for Error {
             SuicidalMove => "Suicide is not allowed",
             RetakingKo => "Cannot retake ko at once",
             MissingGoboard => "Missing goboard definition",
+            InvalidRootNode => "Invalid root node",
         }
     }
 }
