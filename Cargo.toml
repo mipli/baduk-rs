@@ -1,8 +1,11 @@
 [package]
 name = "baduk-rs"
 version = "0.1.0"
-authors = ["Michael A. Plikk <michael@aptoma.com>"]
+authors = ["Michael A. Plikk <michael@plikk.com>"]
 edition = "2018"
+license = "MIT"
+repository = "https://github.com/mipli/baduk-rs"
+readme = "README.md"
 
 [dependencies]
-sgf-parser = { path = "/home/michael/code/rust/sgf-parser" }
+sgf-parser = "*"
