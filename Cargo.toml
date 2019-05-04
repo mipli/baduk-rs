@@ -9,3 +9,4 @@ readme = "README.md"
 
 [dependencies]
 sgf-parser = "*"
+derive_more = "0.14.0"

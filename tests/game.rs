@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod game_tests {
-    use baduk_rs::{GameTree, GameState, Color, Error};
+    use baduk_rs::{GameTree, GameState, Color, BadukErrorKind};
     use sgf_parser::{parse};
 
     #[test]
@@ -34,13 +34,13 @@ mod game_tests {
     fn it_can_play_moves() {
         let mut game = GameTree::new(19, 19);
         let id = game.play_move((4, 3), Color::Black);
-        assert_eq!(id, Ok(1));
+        assert_eq!(id.unwrap(), 1);
         let id = game.play_move((16, 16), Color::White);
-        assert_eq!(id, Ok(2));
+        assert_eq!(id.unwrap(), 2);
         let id = game.play_move((16, 4), Color::Black);
-        assert_eq!(id, Ok(3));
+        assert_eq!(id.unwrap(), 3);
         let id = game.play_move((3, 16), Color::White);
-        assert_eq!(id, Ok(4));
+        assert_eq!(id.unwrap(), 4);
         assert_eq!(game.count_nodes(), 5);
         let state = game.current_state().unwrap();
         let captures = state.captures();
@@ -86,7 +86,7 @@ mod game_tests {
         let _ = game.play_move((2, 1), Color::Black);
         let err = game.play_move((1, 1), Color::White);
         match err {
-            Err(Error::SuicidalMove) => assert!(true),
+            Err(e) => assert_eq!(e.kind, BadukErrorKind::SuicidalMove),
             _ => assert!(false),
         }
 
@@ -120,7 +120,7 @@ mod game_tests {
 
         let err = game.play_move((3, 2), Color::Black);
         match err {
-            Err(Error::RetakingKo) => assert!(true),
+            Err(e) => assert_eq!(e.kind, BadukErrorKind::RetakingKo),
             _ => assert!(false),
         }
 
@@ -232,5 +232,12 @@ mod game_tests {
 
         let node = game.get_node(2).unwrap();
         assert_eq!(node.tokens.len(), 2);
+    }
+
+    #[test]
+    fn it_can_parse_sgf_string() {
+        use std::convert::TryFrom;
+        let game: GameTree = GameTree::try_from("(;SZ[19]W[ba]C[foobar];W[ab]AB[ca];CR[2019]B[ee])").unwrap();
+        assert_eq!(game.count_nodes(), 3);
     }
 }

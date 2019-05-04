@@ -1,5 +1,6 @@
-use crate::{GameState, Captures, Error, Position, Color, SgfToken};
-use sgf_parser::{GameTree as SgfTree};
+use crate::{GameState, BadukError, BadukErrorKind, Position, Color, SgfToken};
+use sgf_parser::{GameTree as SgfTree, parse};
+use std::convert::TryFrom;
 
 pub type GameTreeIndex = usize;
 
@@ -93,24 +94,24 @@ impl GameTree {
         new_id
     }
 
-    pub fn play_move(&mut self, pos: impl Into<Position>, color: Color) -> Result<GameTreeIndex, Error> {
+    pub fn play_move(&mut self, pos: impl Into<Position>, color: Color) -> Result<GameTreeIndex, BadukError> {
         self.play_move_as_variation(pos, color, self.current)
     }
 
-    pub fn play_move_as_variation(&mut self, pos: impl Into<Position>, color: Color, parent: GameTreeIndex) -> Result<GameTreeIndex, Error> {
+    pub fn play_move_as_variation(&mut self, pos: impl Into<Position>, color: Color, parent: GameTreeIndex) -> Result<GameTreeIndex, BadukError> {
         let pos = pos.into();
         let current_node = &self.nodes[parent];
         match current_node.state {
-            None => Err(Error::MissingGoboard),
+            None => Err(BadukErrorKind::MissingGoBoard.into()),
             Some(ref current_state) => {
                 let mut state = current_state.place_stone(pos, color)?;
                 let removed = state.remove_dead_stones(!color);
                 let valid = state.is_valid();
                 if !valid {
-                    Err(Error::SuicidalMove)
+                    Err(BadukErrorKind::SuicidalMove.into())
                 } else {
                     if self.is_directly_retaking_ko(color, &state) {
-                        return Err(Error::RetakingKo);
+                        return Err(BadukErrorKind::RetakingKo.into());
                     }
                     state.capture_stones(removed.len() as i32, !color);
                     let tokens = vec![SgfToken::Move {
@@ -123,19 +124,19 @@ impl GameTree {
         }
     }
 
-    fn play_move_on_node(&mut self, pos: impl Into<Position>, color: Color, node: GameTreeIndex) -> Result<GameTreeIndex, Error> {
+    fn play_move_on_node(&mut self, pos: impl Into<Position>, color: Color, node: GameTreeIndex) -> Result<GameTreeIndex, BadukError> {
         let pos = pos.into();
         match self.nodes[node].state {
-            None => Err(Error::MissingGoboard),
+            None => Err(BadukErrorKind::MissingGoBoard.into()),
             Some(ref current_state) => {
                 let mut state = current_state.place_stone(pos, color)?;
                 let removed = state.remove_dead_stones(!color);
                 let valid = state.is_valid();
                 if !valid {
-                    Err(Error::SuicidalMove)
+                    Err(BadukErrorKind::SuicidalMove.into())
                 } else {
                     if self.is_directly_retaking_ko(color, &state) {
-                        return Err(Error::RetakingKo);
+                        return Err(BadukErrorKind::RetakingKo.into());
                     }
                     state.capture_stones(removed.len() as i32, !color);
                     self.nodes[node].tokens.push(SgfToken::Move {
@@ -149,16 +150,16 @@ impl GameTree {
         }
     }
 
-    pub fn add_stone(&mut self, pos: impl Into<Position>, color: Color) -> Result<GameTreeIndex, Error> {
+    pub fn add_stone(&mut self, pos: impl Into<Position>, color: Color) -> Result<GameTreeIndex, BadukError> {
         self.add_stone_on_node(pos, color, self.current)
     }
 
-    pub fn add_stone_on_node(&mut self, pos: impl Into<Position>, color: Color, node: GameTreeIndex) -> Result<GameTreeIndex, Error> {
+    pub fn add_stone_on_node(&mut self, pos: impl Into<Position>, color: Color, node: GameTreeIndex) -> Result<GameTreeIndex, BadukError> {
         let pos = pos.into();
         let current_node = &self.nodes[node];
 
         match current_node.state {
-            None => Err(Error::MissingGoboard),
+            None => Err(BadukErrorKind::MissingGoBoard.into()),
             Some(ref current_state) => {
                 let state = current_state.add_stone(pos, color)?;
                 self.nodes[node].tokens.push(
@@ -191,9 +192,9 @@ impl GameTree {
         node
     }
 
-    pub fn set_size(&mut self, width: u32, height: u32, node: GameTreeIndex) -> Result<GameTreeIndex, Error> {
+    pub fn set_size(&mut self, width: u32, height: u32, node: GameTreeIndex) -> Result<GameTreeIndex, BadukError> {
         if node != self.root {
-            Err(Error::InvalidRootNode)
+            Err(BadukErrorKind::InvalidRootNode.into())
         } else {
             self.nodes[node].tokens.push(SgfToken::Size(width, height));
             self.nodes[node].state = Some(GameState::new(width, height));
@@ -201,7 +202,7 @@ impl GameTree {
         }
     }
 
-    pub fn parse_sgf_token(&mut self, token: &SgfToken, node: GameTreeIndex) -> Result<GameTreeIndex, Error> {
+    pub fn parse_sgf_token(&mut self, token: &SgfToken, node: GameTreeIndex) -> Result<GameTreeIndex, BadukError> {
         let index = match token {
             SgfToken::Move{color, coordinate} => {
                 self.play_move_on_node(*coordinate, *color, node)?
@@ -227,6 +228,15 @@ impl From<&SgfTree> for GameTree {
         let mut game = GameTree::default();
         parse_variation(&mut game, tree, None);
         game
+    }
+}
+
+impl TryFrom<&str> for GameTree {
+    type Error = BadukError;
+
+    fn try_from(input: &str) -> Result<GameTree, BadukError> {
+        let tree: SgfTree = parse(input).map_err(BadukError::invalid_root_node)?;
+        Ok((&tree).into())
     }
 }
 

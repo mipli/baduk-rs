@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod state_tests {
-    use baduk_rs::{Error, GameState, Color};
+    use baduk_rs::{BadukError, BadukErrorKind, GameState, Color};
 
     #[test]
     fn it_creates_empty_state() {
@@ -21,7 +21,7 @@ mod state_tests {
         let err = ".x.o....".parse::<GameState>();
         assert!(err.is_err());
         match err {
-            Err(Error::InvalidInputSize) => assert!(true),
+            Err(e) => assert_eq!(e.kind, BadukErrorKind::InvalidInputSize),
             _ => assert!(false),
         }
     }
@@ -32,7 +32,7 @@ mod state_tests {
         let err = state.place_stone((25, 5), Color::White);
         assert!(err.is_err());
         match err {
-            Err(e) => assert_eq!(e, Error::InvalidPosition((25, 5).into())),
+            Err(e) => assert_eq!(e.kind, BadukErrorKind::InvalidPosition((25, 5).into())),
             Ok(_) => assert!(false)
         }
     }
@@ -60,7 +60,7 @@ mod state_tests {
         let err = state.place_stone((1, 1), Color::White);
         assert!(err.is_err());
         match err {
-            Err(e) => assert_eq!(e, Error::AlreadyOccupied((1, 1).into())),
+            Err(e) => assert_eq!(e.kind, BadukErrorKind::AlreadyOccupied((1, 1).into())),
             Ok(_) => assert!(false)
         }
     }

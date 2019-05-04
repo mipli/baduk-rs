@@ -1,4 +1,4 @@
-use crate::{Error, Position, Color};
+use crate::{BadukError, BadukErrorKind, Position, Color};
 use std::collections::HashSet;
 
 type Intersection = Option<Color>;
@@ -110,23 +110,23 @@ impl GameState {
         self.board[index].as_ref()
     }
 
-    pub fn place_stone(&self, pos: impl Into<Position>, color: Color) -> Result<GameState, Error> {
+    pub fn place_stone(&self, pos: impl Into<Position>, color: Color) -> Result<GameState, BadukError> {
         let pos = pos.into();
         if !self.is_valid_position(pos) {
-            return Err(Error::InvalidPosition(pos));
+            return Err(BadukErrorKind::InvalidPosition(pos).into());
         }
         let index = self.position_to_index(pos);
         let mut state = (*self).clone();
         match state.board[index] {
             None => state.board[index] = Some(color),
             Some(_) => {
-                return Err(Error::AlreadyOccupied(pos));
+                return Err(BadukErrorKind::AlreadyOccupied(pos).into());
             }
         }
         Ok(state)
     }
 
-    pub fn add_stone(&self, pos: impl Into<Position>, color: Color) -> Result<GameState, Error> {
+    pub fn add_stone(&self, pos: impl Into<Position>, color: Color) -> Result<GameState, BadukError> {
         let pos = pos.into();
         let index = self.position_to_index(pos);
         let mut state = (*self).clone();
@@ -134,10 +134,10 @@ impl GameState {
         Ok(state)
     }
 
-    pub fn remove_stone(&mut self, pos: impl Into<Position>) -> Result<(), Error> {
+    pub fn remove_stone(&mut self, pos: impl Into<Position>) -> Result<(), BadukError> {
         let pos = pos.into();
         if !self.is_valid_position(pos) {
-            return Err(Error::InvalidPosition(pos));
+            return Err(BadukErrorKind::InvalidPosition(pos).into());
         }
         let index = self.position_to_index(pos);
         self.board[index] = None;
@@ -261,9 +261,9 @@ impl Default for GameState {
 }
 
 impl std::str::FromStr for GameState {
-    type Err = Error;
+    type Err = BadukError;
 
-    fn from_str(data: &str) -> Result<GameState, Error> {
+    fn from_str(data: &str) -> Result<GameState, BadukError> {
         let board = data.chars().fold(vec![], |mut board, c| {
             match c {
                 '.' => board.push(None),
@@ -275,7 +275,7 @@ impl std::str::FromStr for GameState {
         });
         let size = (board.len() as f64).sqrt() as u32;
         if size * size != (board.len() as u32) {
-            Err(Error::InvalidInputSize)
+            Err(BadukErrorKind::InvalidInputSize.into())
         } else {
             Ok(GameState {
                 board,

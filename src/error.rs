@@ -1,48 +1,105 @@
-use std::error;
-use std::fmt;
+use derive_more::*;
 
-use crate::Position;
+use crate::{Position};
+use std::error::Error;
 
-#[derive(Debug, Eq, PartialEq)]
-pub enum Error {
-    InvalidPosition(Position),
-    AlreadyOccupied(Position),
-    InvalidInputSize,
-    SuicidalMove,
-    RetakingKo,
-    MissingGoboard,
-    InvalidRootNode
+/// SGF parsing, or traversal, related errors
+#[derive(Debug, Display)]
+#[display(fmt = "{}", kind)]
+pub struct BadukError {
+    pub kind: BadukErrorKind,
+    source: Option<Box<dyn Error + Send + Sync + 'static>>,
 }
 
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::Error::*;
-        use std::error::Error;
+/// Describes what kind of error we're dealing with
+#[derive(Debug, Display, Eq, PartialEq)]
+pub enum BadukErrorKind {
+    #[display(fmt = "Invalid position")]
+    InvalidPosition(Position),
+    #[display(fmt = "Position already occupied")]
+    AlreadyOccupied(Position),
+    #[display(fmt = "Invalid input size")]
+    InvalidInputSize,
+    #[display(fmt = "Suicidal move")]
+    SuicidalMove,
+    #[display(fmt = "Illegal retaking of ko")]
+    RetakingKo,
+    #[display(fmt = "No go board defined")]
+    MissingGoBoard,
+    #[display(fmt = "Invalid root node")]
+    InvalidRootNode,
+    #[display(fmt = "Invalid input")]
+    InvalidInput,
+}
 
-        match *self {
-            InvalidPosition(pos) => write!(f, "{}: ({})", self.description(), pos),
-            AlreadyOccupied(pos) => write!(f, "{}: ({})", self.description(), pos),
-            InvalidInputSize => write!(f, "{}", self.description()),
-            SuicidalMove => write!(f, "{}", self.description()),
-            RetakingKo => write!(f, "{}", self.description()),
-            MissingGoboard => write!(f, "{}", self.description()),
-            InvalidRootNode => write!(f, "{}", self.description()),
-        }
+impl Error for BadukError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        self.source
+            .as_ref()
+            .map(|boxed| boxed.as_ref() as &(dyn Error + 'static))
     }
 }
 
-impl error::Error for Error {
-    fn description(&self) -> &str {
-        use self::Error::*;
+impl From<BadukErrorKind> for BadukError {
+    fn from(kind: BadukErrorKind) -> BadukError {
+        BadukError { kind, source: None }
+    }
+}
 
-        match *self {
-            InvalidPosition(_) => "Cannot place stone at position",
-            AlreadyOccupied(_) => "Position was already occupied",
-            InvalidInputSize => "Input was not square size",
-            SuicidalMove => "Suicide is not allowed",
-            RetakingKo => "Cannot retake ko at once",
-            MissingGoboard => "Missing goboard definition",
-            InvalidRootNode => "Invalid root node",
+impl BadukError {
+    pub fn invalid_position(pos: Position, err: impl Error + Send + Sync + 'static) -> Self {
+        BadukError {
+            kind: BadukErrorKind::InvalidPosition(pos),
+            source: Some(Box::new(err)),
+        }
+    }
+
+    pub fn already_occupied(pos: Position, err: impl Error + Send + Sync + 'static) -> Self {
+        BadukError {
+            kind: BadukErrorKind::AlreadyOccupied(pos),
+            source: Some(Box::new(err)),
+        }
+    }
+
+    pub fn invalid_input(err: impl Error + Send + Sync + 'static) -> Self {
+        BadukError {
+            kind: BadukErrorKind::InvalidInput,
+            source: Some(Box::new(err)),
+        }
+    }
+
+    pub fn invalid_root_node(err: impl Error + Send + Sync + 'static) -> Self {
+        BadukError {
+            kind: BadukErrorKind::InvalidRootNode,
+            source: Some(Box::new(err)),
+        }
+    }
+
+    pub fn missing_go_board(err: impl Error + Send + Sync + 'static) -> Self {
+        BadukError {
+            kind: BadukErrorKind::MissingGoBoard,
+            source: Some(Box::new(err)),
+        }
+    }
+
+    pub fn retaking_ko(err: impl Error + Send + Sync + 'static) -> Self {
+        BadukError {
+            kind: BadukErrorKind::RetakingKo,
+            source: Some(Box::new(err)),
+        }
+    }
+
+    pub fn suicidal_move(err: impl Error + Send + Sync + 'static) -> Self {
+        BadukError {
+            kind: BadukErrorKind::SuicidalMove,
+            source: Some(Box::new(err)),
+        }
+    }
+
+    pub fn invalid_input_size(err: impl Error + Send + Sync + 'static) -> Self {
+        BadukError {
+            kind: BadukErrorKind::InvalidInputSize,
+            source: Some(Box::new(err)),
         }
     }
 }
